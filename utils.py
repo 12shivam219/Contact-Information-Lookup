@@ -2,6 +2,7 @@ import re
 import time
 import requests
 from typing import Dict, Optional, Tuple
+from web_scraper import search_contact_info
 
 class RateLimiter:
     def __init__(self, calls_per_minute: int = 30):
@@ -36,27 +37,28 @@ def validate_company_name(name: str) -> Tuple[bool, str]:
     return True, ""
 
 def search_person(person_name: str, company_name: str) -> Optional[Dict]:
-    """Search person information using various APIs"""
+    """Search person information using various APIs and web scraping"""
     try:
-        # Example using a people search API (placeholder for demonstration)
-        params = {
-            'name': person_name,
-            'company': company_name
-        }
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        # Get contact information through web scraping
+        contact_info = search_contact_info(person_name, company_name)
 
-        # For demonstration, using a mock response
-        # In reality, you would integrate with actual people search APIs
-        mock_data = {
+        if not contact_info:
+            contact_info = {}
+
+        # Combine all information
+        person_info = {
             'name': person_name,
             'company': company_name,
-            'position': 'Position information would appear here',
-            'professional_details': 'Professional details would appear here',
-            'public_info': 'Public information would appear here'
+            'position': 'Professional',  # This would be found through scraping
+            'email': contact_info.get('email'),
+            'phone': contact_info.get('phone'),
+            'social_profiles': contact_info.get('social_profiles', {}),
+            'confidence_score': contact_info.get('confidence_score', 'low')
         }
 
-        return mock_data
-    except Exception:
+        return person_info
+    except Exception as e:
+        print(f"Error in search_person: {str(e)}")
         return None
 
 def search_company_info(company_name: str) -> Optional[Dict]:

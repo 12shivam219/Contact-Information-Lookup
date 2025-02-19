@@ -76,10 +76,18 @@ def main():
                         <div class="company-info">
                             <p><strong>Name:</strong> {person_info.get('name', 'N/A')}</p>
                             <p><strong>Company:</strong> {person_info.get('company', 'N/A')}</p>
+                            <p><strong>Email:</strong> {person_info.get('email', 'N/A')}</p>
+                            <p><strong>Phone:</strong> {person_info.get('phone', 'N/A')}</p>
                             <p><strong>Position:</strong> {person_info.get('position', 'N/A')}</p>
-                            <p><strong>Professional Details:</strong> {person_info.get('professional_details', 'N/A')}</p>
+                            <p><strong>Confidence Score:</strong> {person_info.get('confidence_score', 'N/A')}</p>
                         </div>
                         """, unsafe_allow_html=True)
+
+                        # Display social profiles if available
+                        if person_info.get('social_profiles'):
+                            st.markdown("### Social Profiles")
+                            for platform, url in person_info['social_profiles'].items():
+                                st.markdown(f"- {platform.title()}: {url}")
 
                     # Display company information
                     if company_info:
@@ -105,6 +113,7 @@ def main():
         ### Data Sources
         - Company information is provided by Clearbit's API
         - Person information is aggregated from public sources
+        - Contact details are found through public web searches
 
         ### Usage Guidelines
         - Respect rate limits and fair usage policies
