@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from urllib.parse import quote
+from api_services import RocketReachAPI
 
 def validate_phone_number(phone: str) -> Tuple[bool, str]:
     """Validate phone number format and length"""
@@ -23,14 +24,24 @@ def validate_phone_number(phone: str) -> Tuple[bool, str]:
 
 def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
     """
-    Search for contact information using web scraping and free APIs
+    Search for contact information using RocketReach API first,
+    then fall back to web scraping if API fails or is unavailable
     """
     try:
-        # Create search queries
+        # First try RocketReach API
+        rocket_reach = RocketReachAPI()
+        api_result = rocket_reach.lookup_person(person_name, company_name)
+
+        if api_result and api_result.get('phone'):
+            return api_result
+
+        # If API fails or no phone number found, fall back to web scraping
+        print("Falling back to web scraping...")
+
+        # Rest of the original web scraping code remains the same
         search_query = f"{person_name} {company_name} contact phone"
         encoded_query = quote(search_query)
 
-        # Use multiple user agents to avoid blocking
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
