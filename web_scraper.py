@@ -35,10 +35,10 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
         # Extract email using pattern matching
         email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
         phone_patterns = [
-            r'\+?1?\d{10,14}',  # Basic international format
-            r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',  # International format
-            r'\(\d{3}\)\s*\d{3}[-.\s]?\d{4}',  # (123) 456-7890
-            r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}'    # 123-456-7890
+            r'\+?1?[-.\s]?\d{10,14}',  # Basic International Format
+            r'\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',  # Complex International Format
+            r'\+?1?\s?\(?\d{3}\)?\s*\d{3}[-.\s]?\d{4}',  # US Format with Parentheses
+            r'\+?1?\s?\d{3}[-.\s]?\d{3}[-.\s]?\d{4}'     # Simple Format
         ]
 
         # Generate email based on common patterns
