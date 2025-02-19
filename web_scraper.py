@@ -75,7 +75,11 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
 
         # 2. Try company website and its subpages
         company_domain = f"www.{company_name.lower().replace(' ', '')}.com"
-        subpages = ['/contact', '/about', '/team', '/directory', '/staff']
+        subpages = [
+            '/contact', '/about', '/team', '/directory', '/staff',
+            '/people', '/management', '/leadership', '/executives',
+            '/our-team', '/contact-us', '/about-us'
+        ]
 
         for subpage in subpages:
             if phone:
@@ -102,7 +106,7 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
             except Exception:
                 continue
 
-        # 3. Try business directories
+        # 3. Try business directories and public records
         if not phone:
             try:
                 directories = [
@@ -110,7 +114,11 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
                     ('Yelp', f"https://www.yelp.com/search?find_desc={encoded_query}"),
                     ('Better Business Bureau', f"https://www.bbb.org/search?find_text={encoded_query}"),
                     ('Manta', f"https://www.manta.com/search?search_source=nav&search={encoded_query}"),
-                    ('Chamber of Commerce', f"https://www.chamberofcommerce.com/united-states/{encoded_query}")
+                    ('Chamber of Commerce', f"https://www.chamberofcommerce.com/united-states/{encoded_query}"),
+                    ('Local Business Directory', f"https://local.com/business/search/{encoded_query}"),
+                    ('White Pages', f"https://www.whitepages.com/business/{encoded_query}"),
+                    ('CrunchBase', f"https://www.crunchbase.com/textsearch?q={encoded_query}"),
+                    ('ZoomInfo', f"https://www.zoominfo.com/s/#!search/company/{encoded_query}")
                 ]
 
                 for directory_name, url in directories:
@@ -164,12 +172,15 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
             except Exception:
                 pass
 
-        # Prepare social profiles
+        # 5. Try LinkedIn public profile (respectful of ToS)
         linkedin_name = person_name.lower().replace(' ', '-')
+        company_slug = company_name.lower().replace(' ', '-')
         social_profiles = {
             'linkedin': f"https://linkedin.com/in/{linkedin_name}",
+            'linkedin_company': f"https://linkedin.com/company/{company_slug}",
             'twitter': f"https://twitter.com/{person_name.lower().replace(' ', '')}",
-            'company': f"https://{company_domain}"
+            'company': f"https://{company_domain}",
+            'facebook': f"https://facebook.com/{company_slug}"
         }
 
         contact_info = {
