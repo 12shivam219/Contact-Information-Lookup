@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.vscode/
+*.swp
+*~
+*.log  # Ignore log files
+data/   # Ignore the data directory (for large datasets, consider cloud storage)
+config.ini  # Or, better, use environment variables for secrets
