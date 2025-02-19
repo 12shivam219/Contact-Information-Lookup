@@ -3,6 +3,8 @@ import re
 from typing import Optional, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
+import json
+from urllib.parse import quote
 
 def validate_phone_number(phone: str) -> Tuple[bool, str]:
     """Validate phone number format and length"""
@@ -21,19 +23,19 @@ def validate_phone_number(phone: str) -> Tuple[bool, str]:
 
 def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
     """
-    Search for contact information using web scraping
+    Search for contact information using web scraping and free APIs
     """
     try:
         # Create search queries
-        search_query = f"{person_name} {company_name} contact email phone"
+        search_query = f"{person_name} {company_name} contact phone"
+        encoded_query = quote(search_query)
 
-        # Use a search engine API (this is a mock URL, you would need to use a real search API)
+        # Use multiple user agents to avoid blocking
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
-        # Extract email using pattern matching
-        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        # Phone number patterns
         phone_patterns = [
             r'\+?1?[-.\s]?\d{10,14}',  # Basic International Format
             r'\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',  # Complex International Format
@@ -49,68 +51,44 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
         confidence_score = 'low'
         source = None
 
-        # 1. Try company website
-        company_domain = f"www.{company_name.lower().replace(' ', '')}.com"
+        # 1. Try Google Business API (free tier)
         try:
-            response = requests.get(f"https://{company_domain}/contact", headers=headers, timeout=5)
+            google_search_url = f"https://customsearch.googleapis.com/customsearch/v1?q={encoded_query}+phone"
+            response = requests.get(google_search_url, headers=headers, timeout=5)
             if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                # Look for phone numbers in contact page
-                text_content = soup.get_text()
-                for pattern in phone_patterns:
-                    matches = re.findall(pattern, text_content)
-                    if matches:
-                        candidate_phone = matches[0]
-                        is_valid, _ = validate_phone_number(candidate_phone)
-                        if is_valid:
-                            phone = candidate_phone
-                            confidence_score = 'high'
-                            source = 'Company Website'
-                            break
+                data = response.json()
+                if 'items' in data:
+                    for item in data['items']:
+                        snippet = item.get('snippet', '')
+                        for pattern in phone_patterns:
+                            matches = re.findall(pattern, snippet)
+                            if matches:
+                                candidate_phone = matches[0]
+                                is_valid, _ = validate_phone_number(candidate_phone)
+                                if is_valid:
+                                    phone = candidate_phone
+                                    confidence_score = 'high'
+                                    source = 'Google Business'
+                                    break
         except Exception:
             pass
 
-        # 2. Try LinkedIn-style URL (public profile)
-        linkedin_name = person_name.lower().replace(' ', '-')
-        social_profiles = {
-            'linkedin': f"https://linkedin.com/in/{linkedin_name}",
-            'twitter': f"https://twitter.com/{person_name.lower().replace(' ', '')}"
-        }
+        # 2. Try company website and its subpages
+        company_domain = f"www.{company_name.lower().replace(' ', '')}.com"
+        subpages = ['/contact', '/about', '/team', '/directory', '/staff']
 
-        # 3. If no phone found, try company directory style URL
-        if not phone:
+        for subpage in subpages:
+            if phone:
+                break
             try:
-                directory_url = f"https://{company_domain}/directory"
-                response = requests.get(directory_url, headers=headers, timeout=5)
+                url = f"https://{company_domain}{subpage}"
+                response = requests.get(url, headers=headers, timeout=5)
                 if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    # Look for phone numbers in directory
-                    text_content = soup.get_text()
-                    for pattern in phone_patterns:
-                        matches = re.findall(pattern, text_content)
-                        if matches:
-                            candidate_phone = matches[0]
-                            is_valid, _ = validate_phone_number(candidate_phone)
-                            if is_valid:
-                                phone = candidate_phone
-                                confidence_score = 'medium'
-                                source = 'Company Directory'
-                                break
-            except Exception:
-                pass
+                    # Use trafilatura for better text extraction
+                    downloaded = trafilatura.fetch_url(url)
+                    text_content = trafilatura.extract(downloaded)
 
-        # 4. As a last resort, try business directories
-        if not phone:
-            try:
-                directories = [
-                    ('Yellow Pages', f"https://www.yellowpages.com/search?q={company_name}"),
-                    ('Yelp', f"https://www.yelp.com/search?find_desc={company_name}")
-                ]
-                for directory_name, url in directories:
-                    response = requests.get(url, headers=headers, timeout=5)
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        text_content = soup.get_text()
+                    if text_content:
                         for pattern in phone_patterns:
                             matches = re.findall(pattern, text_content)
                             if matches:
@@ -118,13 +96,81 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
                                 is_valid, _ = validate_phone_number(candidate_phone)
                                 if is_valid:
                                     phone = candidate_phone
-                                    confidence_score = 'low'
-                                    source = directory_name
+                                    confidence_score = 'high'
+                                    source = f'Company Website ({subpage})'
                                     break
+            except Exception:
+                continue
+
+        # 3. Try business directories
+        if not phone:
+            try:
+                directories = [
+                    ('Yellow Pages', f"https://www.yellowpages.com/search?q={encoded_query}"),
+                    ('Yelp', f"https://www.yelp.com/search?find_desc={encoded_query}"),
+                    ('Better Business Bureau', f"https://www.bbb.org/search?find_text={encoded_query}"),
+                    ('Manta', f"https://www.manta.com/search?search_source=nav&search={encoded_query}"),
+                    ('Chamber of Commerce', f"https://www.chamberofcommerce.com/united-states/{encoded_query}")
+                ]
+
+                for directory_name, url in directories:
                     if phone:
                         break
+                    try:
+                        response = requests.get(url, headers=headers, timeout=5)
+                        if response.status_code == 200:
+                            # Use both BeautifulSoup and trafilatura
+                            soup = BeautifulSoup(response.text, 'html.parser')
+                            text_content = soup.get_text()
+
+                            # Also try trafilatura
+                            downloaded = trafilatura.fetch_url(url)
+                            if downloaded:
+                                text_content += trafilatura.extract(downloaded) or ''
+
+                            for pattern in phone_patterns:
+                                matches = re.findall(pattern, text_content)
+                                if matches:
+                                    candidate_phone = matches[0]
+                                    is_valid, _ = validate_phone_number(candidate_phone)
+                                    if is_valid:
+                                        phone = candidate_phone
+                                        confidence_score = 'medium'
+                                        source = directory_name
+                                        break
+                    except Exception:
+                        continue
             except Exception:
                 pass
+
+        # 4. Try DuckDuckGo API (free)
+        if not phone:
+            try:
+                duckduckgo_url = f"https://api.duckduckgo.com/?q={encoded_query}&format=json"
+                response = requests.get(duckduckgo_url, headers=headers, timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    text_to_search = json.dumps(data)  # Search through all data
+                    for pattern in phone_patterns:
+                        matches = re.findall(pattern, text_to_search)
+                        if matches:
+                            candidate_phone = matches[0]
+                            is_valid, _ = validate_phone_number(candidate_phone)
+                            if is_valid:
+                                phone = candidate_phone
+                                confidence_score = 'medium'
+                                source = 'DuckDuckGo'
+                                break
+            except Exception:
+                pass
+
+        # Prepare social profiles
+        linkedin_name = person_name.lower().replace(' ', '-')
+        social_profiles = {
+            'linkedin': f"https://linkedin.com/in/{linkedin_name}",
+            'twitter': f"https://twitter.com/{person_name.lower().replace(' ', '')}",
+            'company': f"https://{company_domain}"
+        }
 
         contact_info = {
             'email': email,
