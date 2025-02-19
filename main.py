@@ -11,6 +11,15 @@ from styles import apply_custom_styles
 # Initialize rate limiter
 rate_limiter = RateLimiter()
 
+def get_confidence_color(score: str) -> str:
+    """Return color based on confidence score"""
+    colors = {
+        'high': 'green',
+        'medium': 'orange',
+        'low': 'red'
+    }
+    return colors.get(score.lower(), 'gray')
+
 def main():
     # Page config must be the first Streamlit command
     st.set_page_config(
@@ -72,16 +81,30 @@ def main():
                     # Display person information
                     if person_info:
                         st.markdown("### Person Information")
+
+                        # Get confidence information
+                        confidence = person_info.get('confidence_score', 'low')
+                        source = person_info.get('source', 'Unknown')
+                        confidence_color = get_confidence_color(confidence)
+
+                        # Display basic info
                         st.markdown(f"""
                         <div class="company-info">
                             <p><strong>Name:</strong> {person_info.get('name', 'N/A')}</p>
                             <p><strong>Company:</strong> {person_info.get('company', 'N/A')}</p>
                             <p><strong>Email:</strong> {person_info.get('email', 'N/A')}</p>
-                            <p><strong>Phone:</strong> {person_info.get('phone', 'N/A')}</p>
                             <p><strong>Position:</strong> {person_info.get('position', 'N/A')}</p>
-                            <p><strong>Confidence Score:</strong> {person_info.get('confidence_score', 'N/A')}</p>
+                            <p><strong>Phone:</strong> {person_info.get('phone', 'N/A')}</p>
                         </div>
                         """, unsafe_allow_html=True)
+
+                        # Display data reliability information
+                        st.info(f"""
+                        **Data Reliability Information:**
+                        - Confidence Level: <span style='color: {confidence_color}'>{confidence.upper()}</span>
+                        - Source: {source}
+                        - Note: Contact information is gathered from publicly available sources and may need verification.
+                        """)
 
                         # Display social profiles if available
                         if person_info.get('social_profiles'):
@@ -114,11 +137,13 @@ def main():
         - Company information is provided by Clearbit's API
         - Person information is aggregated from public sources
         - Contact details are found through public web searches
+        - Data reliability is indicated by confidence scores
 
         ### Usage Guidelines
         - Respect rate limits and fair usage policies
         - Do not use this tool for unauthorized data collection
         - We are not responsible for the accuracy of the data
+        - Always verify contact information before use
         """)
 
     # Footer

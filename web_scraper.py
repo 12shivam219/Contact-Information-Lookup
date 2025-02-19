@@ -1,8 +1,23 @@
 import trafilatura
 import re
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
+
+def validate_phone_number(phone: str) -> Tuple[bool, str]:
+    """Validate phone number format and length"""
+    # Remove all non-digit characters
+    digits = re.sub(r'\D', '', phone)
+
+    # Check length (most phone numbers are 10-15 digits)
+    if len(digits) < 10 or len(digits) > 15:
+        return False, "Invalid length"
+
+    # Basic format validation
+    if not re.match(r'^\+?1?\d{10,14}$', digits):
+        return False, "Invalid format"
+
+    return True, "Valid phone number"
 
 def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
     """
@@ -20,6 +35,7 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
         # Extract email using pattern matching
         email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
         phone_patterns = [
+            r'\+?1?\d{10,14}',  # Basic international format
             r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',  # International format
             r'\(\d{3}\)\s*\d{3}[-.\s]?\d{4}',  # (123) 456-7890
             r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}'    # 123-456-7890
@@ -31,6 +47,7 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
         # Try to find phone number from various sources
         phone = None
         confidence_score = 'low'
+        source = None
 
         # 1. Try company website
         company_domain = f"www.{company_name.lower().replace(' ', '')}.com"
@@ -43,9 +60,13 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
                 for pattern in phone_patterns:
                     matches = re.findall(pattern, text_content)
                     if matches:
-                        phone = matches[0]
-                        confidence_score = 'medium'
-                        break
+                        candidate_phone = matches[0]
+                        is_valid, _ = validate_phone_number(candidate_phone)
+                        if is_valid:
+                            phone = candidate_phone
+                            confidence_score = 'high'
+                            source = 'Company Website'
+                            break
         except Exception:
             pass
 
@@ -68,9 +89,13 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
                     for pattern in phone_patterns:
                         matches = re.findall(pattern, text_content)
                         if matches:
-                            phone = matches[0]
-                            confidence_score = 'medium'
-                            break
+                            candidate_phone = matches[0]
+                            is_valid, _ = validate_phone_number(candidate_phone)
+                            if is_valid:
+                                phone = candidate_phone
+                                confidence_score = 'medium'
+                                source = 'Company Directory'
+                                break
             except Exception:
                 pass
 
@@ -78,10 +103,10 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
         if not phone:
             try:
                 directories = [
-                    f"https://www.yellowpages.com/search?q={company_name}",
-                    f"https://www.yelp.com/search?find_desc={company_name}"
+                    ('Yellow Pages', f"https://www.yellowpages.com/search?q={company_name}"),
+                    ('Yelp', f"https://www.yelp.com/search?find_desc={company_name}")
                 ]
-                for url in directories:
+                for directory_name, url in directories:
                     response = requests.get(url, headers=headers, timeout=5)
                     if response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
@@ -89,9 +114,13 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
                         for pattern in phone_patterns:
                             matches = re.findall(pattern, text_content)
                             if matches:
-                                phone = matches[0]
-                                confidence_score = 'low'  # Lower confidence for directory listings
-                                break
+                                candidate_phone = matches[0]
+                                is_valid, _ = validate_phone_number(candidate_phone)
+                                if is_valid:
+                                    phone = candidate_phone
+                                    confidence_score = 'low'
+                                    source = directory_name
+                                    break
                     if phone:
                         break
             except Exception:
@@ -101,7 +130,8 @@ def search_contact_info(person_name: str, company_name: str) -> Optional[Dict]:
             'email': email,
             'phone': phone,
             'social_profiles': social_profiles,
-            'confidence_score': confidence_score
+            'confidence_score': confidence_score,
+            'source': source
         }
 
         return contact_info
