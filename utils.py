@@ -11,8 +11,7 @@ class RateLimiter:
 
     def can_make_request(self) -> bool:
         current_time = time.time()
-        self.calls = [call_time for call_time in self.calls 
-                     if current_time - call_time < 60]
+        self.calls = [call_time for call_time in self.calls if current_time - call_time < 60]
         return len(self.calls) < self.calls_per_minute
 
     def add_call(self):
@@ -37,25 +36,20 @@ def validate_company_name(name: str) -> Tuple[bool, str]:
     return True, ""
 
 def search_person(person_name: str, company_name: str) -> Optional[Dict]:
-    """Search person information using various APIs and web scraping"""
+    """Search person information using web scraping"""
     try:
-        # Get contact information through web scraping
         contact_info = search_contact_info(person_name, company_name)
-
         if not contact_info:
             contact_info = {}
-
-        # Combine all information
         person_info = {
             'name': person_name,
             'company': company_name,
-            'position': 'Professional',  # This would be found through scraping
+            'position': 'Professional',
             'email': contact_info.get('email'),
             'phone': contact_info.get('phone'),
             'social_profiles': contact_info.get('social_profiles', {}),
             'confidence_score': contact_info.get('confidence_score', 'low')
         }
-
         return person_info
     except Exception as e:
         print(f"Error in search_person: {str(e)}")
